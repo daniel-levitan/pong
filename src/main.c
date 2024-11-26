@@ -10,6 +10,9 @@ SDL_Renderer* renderer = NULL;
 int last_frame_time = 0;
 bool served = FALSE;
 
+bool up1 = FALSE, down1 = FALSE;
+bool up2 = FALSE, down2 = FALSE;
+
 typedef struct Ball {
 	float x;
 	float y;
@@ -66,14 +69,47 @@ void process_input() {
 		game_is_running = FALSE;
 		break;
 	case SDL_KEYDOWN:
-		switch (event.key.keysym.sym) {
+		switch (event.key.keysym.sym) {	// switch (event.key.keysym.scancode) {
 		case SDLK_ESCAPE:
 			game_is_running = FALSE;
 			break;
 		case SDLK_SPACE:
 			served = TRUE;
 			break;
+		case SDLK_w: // event.key.keysym.scancode -> SDL_SCANCODE_W:
+			up1 = TRUE;
+			break;
+		case SDLK_UP:
+			up2 = TRUE;
+			break;
+		case SDLK_s:
+			down1 = TRUE;
+			break;
+		case SDLK_DOWN:
+			down2 = TRUE;
+			break;
+		default:
+			break;
 		}
+		break;
+	case SDL_KEYUP:
+		switch (event.key.keysym.sym) {		
+		case SDLK_w:
+			up1 = FALSE;
+			break;
+		case SDLK_UP:
+			up2 = FALSE;
+			break;
+		case SDLK_s:
+			down1 = FALSE;
+			break;
+		case SDLK_DOWN:
+			down2 = 0;
+			break;
+		default:
+			break;
+		}
+		break;		
 	}
 }
 
@@ -105,9 +141,10 @@ void update() {
 		ball.y += delta_time * ball.ySpeed;
 	}
 
-	// Collision with walls
+	// Check if there was a score
+
+	// Score on left
 	if (ball.x < 0) {
-		// ball.xSpeed = fabs(ball.xSpeed);
 		p2.score += 1;
 		served = FALSE;
 		ball.x = WINDOW_WIDTH/2;
@@ -120,8 +157,9 @@ void update() {
 		SDL_SetWindowTitle(window, buf);
 
 	}
+
+	// Score on right
 	if (ball.x > WINDOW_WIDTH - ball.size) {
-		// ball.xSpeed = -fabs(ball.xSpeed);
 		p1.score += 1;
 		served = FALSE;
 		ball.x = WINDOW_WIDTH/2;
@@ -134,6 +172,7 @@ void update() {
 		SDL_SetWindowTitle(window, buf);
 	}
 
+	// Ball collision
 	if (ball.y < 0) {
 		ball.ySpeed = fabs(ball.ySpeed);
 	}
@@ -141,40 +180,13 @@ void update() {
 		ball.ySpeed = -fabs(ball.ySpeed);
 	}
 
-	// Goal
-	// if (ball.x < ball.size / 2) {
-	// 	p2.score += 1;
-	// 	served = FALSE;
-	// 	ball.x = WINDOW_WIDTH/2;
-	// 	ball.y = WINDOW_HEIGHT/2;
-	// }
+	// Paddles 
 
-	// if (ball.x >= WINDOW_WIDTH - ball.size / 2) {
-	// 	printf("Here");
-	// 	p1.score += 1;
-	// 	served = FALSE;
-	// 	ball.x = WINDOW_WIDTH/2;
-	// 	ball.y = WINDOW_HEIGHT/2;
-	// }
+	// Player 1 movement
+	if (up1 && !down1) p1.yPosition -= PLAYER_SPEED * delta_time;;
+    if (down1 && !up1) p1.yPosition += PLAYER_SPEED * delta_time;
 
-
-	const Uint8 *keyboard_state = SDL_GetKeyboardState(NULL);
-	
-	// Player 1
-	// if (keyboard_state[SDL_SCANCODE_W] && p1.yPosition - PLAYER_HEIGHT / 2 > 0) {
-	// 	p1.yPosition -= PLAYER_SPEED * delta_time;
-	// }
-	// if (keyboard_state[SDL_SCANCODE_S] && p1.yPosition + PLAYER_HEIGHT / 2 < WINDOW_HEIGHT) {
-	// 	p1.yPosition += PLAYER_SPEED * delta_time;
-	// }
-
-	// Alternativa
-	if (keyboard_state[SDL_SCANCODE_W]) {
-		p1.yPosition -= PLAYER_SPEED * delta_time;
-	}
-	if (keyboard_state[SDL_SCANCODE_S]) {
-		p1.yPosition += PLAYER_SPEED * delta_time;
-	}
+    // Paddle limits
 	if (p1.yPosition < PLAYER_HEIGHT/2) {
 		p1.yPosition = PLAYER_HEIGHT/2;
 	}
@@ -182,22 +194,11 @@ void update() {
 		p1.yPosition = WINDOW_HEIGHT - PLAYER_HEIGHT/2;
 	}
 
+	// Player 2 movements
+	if (up2 && !down2) p2.yPosition -= PLAYER_SPEED * delta_time;;
+    if (down2 && !up2) p2.yPosition += PLAYER_SPEED * delta_time;
 
-	// Player 2
-	// if (keyboard_state[SDL_SCANCODE_UP] && p2.yPosition - PLAYER_HEIGHT / 2 > 0) {
-	// 	p2.yPosition -= PLAYER_SPEED * delta_time;
-	// }
-	// if (keyboard_state[SDL_SCANCODE_DOWN] && p2.yPosition + PLAYER_HEIGHT / 2 < WINDOW_HEIGHT) {
-	// 	p2.yPosition += PLAYER_SPEED * delta_time;
-	// }
-
-	// Alternativa
-	if (keyboard_state[SDL_SCANCODE_UP]) {
-		p2.yPosition -= PLAYER_SPEED * delta_time;
-	}
-	if (keyboard_state[SDL_SCANCODE_DOWN]) {
-		p2.yPosition += PLAYER_SPEED * delta_time;
-	}
+    // Paddle limits
 	if (p2.yPosition < PLAYER_HEIGHT/2) {
 		p2.yPosition = PLAYER_HEIGHT/2;
 	}
@@ -206,21 +207,7 @@ void update() {
 	}
 
 	// Collision
-	// if (ball.x < PLAYER_MARGIN && 
-	// 	ball.y < p1.yPosition + PLAYER_HEIGHT/2 && 
-	// 	ball.y > p1.yPosition - PLAYER_HEIGHT/2) {
-	// 	ball.xSpeed *= -1;
-	// 	ball.ySpeed *= -1 ;
-	// }
-
-	// if (ball.x > WINDOW_WIDTH - PLAYER_MARGIN - ball.size && 
-	// 	ball.y < p2.yPosition + PLAYER_HEIGHT/2 && 
-	// 	ball.y > p2.yPosition - PLAYER_HEIGHT/2) {
-	// 	ball.xSpeed *= -1;
-	// 	ball.ySpeed *= -1 ;
-	// }
-
-	// Alternative collision - Não gostei que estes rects foram declarados novamente
+	// rects declared again, how do I improve this?
 	SDL_Rect ball_rect = {
 		(int)ball.x,
 		(int)ball.y,
@@ -249,11 +236,9 @@ void update() {
 	if (SDL_HasIntersection(&ball_rect, &p2_rect)) {
 		ball.xSpeed = -fabs(ball.xSpeed);
 	}
-
-                             
-
+						 
+	// time update
 	last_frame_time = SDL_GetTicks();
-
 }
 
 void render() {
@@ -302,14 +287,13 @@ int main() {
 
 	setup();
 
-	while (game_is_running) {
+	while (game_is_running) { // game loop
 		process_input();
 		update();
 		render();
 	}
 
 	destroy_window();
-
 	return 0;
 }
 
