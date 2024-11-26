@@ -10,26 +10,28 @@ SDL_Renderer* renderer = NULL;
 int last_frame_time = 0;
 bool served = FALSE;
 
-bool up1 = FALSE, down1 = FALSE;
-bool up2 = FALSE, down2 = FALSE;
+// Buttons for player 1 and 2
+bool up1 = FALSE, down1 = FALSE, up2 = FALSE, down2 = FALSE;
 
 typedef struct Ball {
 	float x;
 	float y;
 	float xSpeed;
 	float ySpeed;
-	// float width;
-	// float height;
 	int size;
 } Ball;
 
 typedef struct Player {
+	int id;
 	int score;
 	float yPosition;
 } Player;
 
 Ball ball;
 Player p1, p2;
+SDL_Rect ball_rect, p1_rect, p2_rect;
+
+void printPlayer(SDL_Rect rect, Player player);
 
 int initialize_window(void) {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -113,23 +115,48 @@ void process_input() {
 	}
 }
 
-void setup() {
-	srand((unsigned int)time(NULL));
-
-	// Pode ser uma função Make ou CreateBall
+void createBall() {
 	ball.x = WINDOW_WIDTH / 2 - ball.size / 2;
 	ball.y = WINDOW_HEIGHT / 2 - ball.size / 2;
 	ball.xSpeed = BALL_SPEED * (coin_flip() ? 1 : -1);
 	ball.ySpeed = BALL_SPEED * (coin_flip() ? 1 : -1);
 	ball.size = 10;
+}
+
+void setup() {
+	srand((unsigned int)time(NULL));
+
+	// Pode ser uma função Make ou CreateBall
+	createBall();
 	
 	// player 1
+	p1.id = 1;
 	p1.score = 0;
 	p1.yPosition = WINDOW_HEIGHT / 2;
 
 	// player 2
+	p2.id = 2;
 	p2.score = 0;
 	p2.yPosition = WINDOW_HEIGHT / 2;
+}
+
+/* Receives the number of the player who scored */
+void updateScore(int player) {
+	char *fmt = "P1 %d  |  P2 %d";
+	int len = snprintf(NULL, 0, fmt, p1.score, p2.score);
+	char buf[len+1];
+
+	if (player == 1) {
+		p1.score += 1;				
+	} else {
+		p2.score += 1;		
+	} 
+
+	snprintf(buf, len + 1, fmt, p1.score, p2.score); 
+	served = FALSE;
+	ball.x = WINDOW_WIDTH/2;
+	ball.y = WINDOW_HEIGHT/2;
+	SDL_SetWindowTitle(window, buf);
 }
 
 void update() {
@@ -142,37 +169,16 @@ void update() {
 	}
 
 	// Check if there was a score
-
 	// Score on left
 	if (ball.x < 0) {
-		p2.score += 1;
-		served = FALSE;
-		ball.x = WINDOW_WIDTH/2;
-		ball.y = WINDOW_HEIGHT/2;	
-
-		char *fmt = "P1 %d  |  P2 %d";
-		int len = snprintf(NULL, 0, fmt, p1.score, p2.score);
-		char buf[len+1];
-		snprintf(buf, len + 1, fmt, p1.score, p2.score); 
-		SDL_SetWindowTitle(window, buf);
-
+		updateScore(2);		
 	}
-
 	// Score on right
 	if (ball.x > WINDOW_WIDTH - ball.size) {
-		p1.score += 1;
-		served = FALSE;
-		ball.x = WINDOW_WIDTH/2;
-		ball.y = WINDOW_HEIGHT/2;
-
-		char *fmt = "P1 %d  |  P2 %d";
-		int len = snprintf(NULL, 0, fmt, p1.score, p2.score);
-		char buf[len+1];
-		snprintf(buf, len + 1, fmt, p1.score, p2.score); 
-		SDL_SetWindowTitle(window, buf);
+		updateScore(1);
 	}
 
-	// Ball collision
+	// Ball collision with walls
 	if (ball.y < 0) {
 		ball.ySpeed = fabs(ball.ySpeed);
 	}
@@ -181,12 +187,11 @@ void update() {
 	}
 
 	// Paddles 
-
 	// Player 1 movement
 	if (up1 && !down1) p1.yPosition -= PLAYER_SPEED * delta_time;;
     if (down1 && !up1) p1.yPosition += PLAYER_SPEED * delta_time;
 
-    // Paddle limits
+    // Limiting paddle 1 to the screen
 	if (p1.yPosition < PLAYER_HEIGHT/2) {
 		p1.yPosition = PLAYER_HEIGHT/2;
 	}
@@ -198,7 +203,7 @@ void update() {
 	if (up2 && !down2) p2.yPosition -= PLAYER_SPEED * delta_time;;
     if (down2 && !up2) p2.yPosition += PLAYER_SPEED * delta_time;
 
-    // Paddle limits
+    // Limiting paddle 2 to the screen
 	if (p2.yPosition < PLAYER_HEIGHT/2) {
 		p2.yPosition = PLAYER_HEIGHT/2;
 	}
@@ -206,33 +211,10 @@ void update() {
 		p2.yPosition = WINDOW_HEIGHT - PLAYER_HEIGHT/2;
 	}
 
-	// Collision
-	// rects declared again, how do I improve this?
-	SDL_Rect ball_rect = {
-		(int)ball.x,
-		(int)ball.y,
-		(int)ball.size,
-		(int)ball.size,
-	};
-
-	SDL_Rect p1_rect = {
-		(int)PLAYER_MARGIN,
-		(int)p1.yPosition - PLAYER_HEIGHT / 2,
-		(int)PLAYER_WIDTH,
-		(int)PLAYER_HEIGHT,
-	};
-
-	SDL_Rect p2_rect = {
-		(int)WINDOW_WIDTH - PLAYER_MARGIN - PLAYER_WIDTH,
-		(int)p2.yPosition - PLAYER_HEIGHT / 2,
-		(int)PLAYER_WIDTH,
-		(int)PLAYER_HEIGHT,
-	};
-
+	// Checking collisions between ball and players
 	if (SDL_HasIntersection(&ball_rect, &p1_rect)) {
 		ball.xSpeed = fabs(ball.xSpeed);
 	}
-
 	if (SDL_HasIntersection(&ball_rect, &p2_rect)) {
 		ball.xSpeed = -fabs(ball.xSpeed);
 	}
@@ -241,37 +223,37 @@ void update() {
 	last_frame_time = SDL_GetTicks();
 }
 
+void renderBall() {
+	ball_rect.x = (int)ball.x;
+	ball_rect.y = (int)ball.y;
+	ball_rect.w = (int)ball.size;
+	ball_rect.h = (int)ball.size;
+
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderFillRect(renderer, &ball_rect);
+}
+
+void renderPlayer(SDL_Rect *rect, Player player) {
+	if (player.id == 1)
+		(*rect).x = (int)PLAYER_MARGIN;
+	else
+		(*rect).x = (int)WINDOW_WIDTH - PLAYER_MARGIN - PLAYER_WIDTH;	
+	(*rect).y = (int)player.yPosition - PLAYER_HEIGHT / 2;
+	(*rect).w = (int)PLAYER_WIDTH;
+	(*rect).h = (int)PLAYER_HEIGHT;
+
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderFillRect(renderer, rect);	
+}
+
 void render() {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
 
-	// Isso pode virar uma função RenderBall
-	SDL_Rect ball_rect = {
-		(int)ball.x,
-		(int)ball.y,
-		(int)ball.size,
-		(int)ball.size,
-	};
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-	SDL_RenderFillRect(renderer, &ball_rect);
-
-	SDL_Rect p1_rect = {
-		(int)PLAYER_MARGIN,
-		(int)p1.yPosition - PLAYER_HEIGHT / 2,
-		(int)PLAYER_WIDTH,
-		(int)PLAYER_HEIGHT,
-	};
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-	SDL_RenderFillRect(renderer, &p1_rect);
-
-	SDL_Rect p2_rect = {
-		(int)WINDOW_WIDTH - PLAYER_MARGIN - PLAYER_WIDTH,
-		(int)p2.yPosition - PLAYER_HEIGHT / 2,
-		(int)PLAYER_WIDTH,
-		(int)PLAYER_HEIGHT,
-	};
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-	SDL_RenderFillRect(renderer, &p2_rect);
+	renderBall();
+		
+	renderPlayer(&p1_rect, p1);
+	renderPlayer(&p2_rect, p2);
 
 	SDL_RenderPresent(renderer);
 }
@@ -298,3 +280,11 @@ int main() {
 }
 
 
+void printPlayer(SDL_Rect rect, Player player) {
+	printf("%d: x->%d, y->%d, w->%d, h->%d\n", 
+	player.id, 
+	rect.x,
+	rect.y,
+	rect.w,
+	rect.h);
+}
