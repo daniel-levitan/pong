@@ -1,0 +1,8 @@
+#include <stdio.h>
+#include "helper.h"
+
+
+int main() {
+	for (int i = 0; i < 10; i++)
+		printf("Coin: %d\n", coin_flip());
+}

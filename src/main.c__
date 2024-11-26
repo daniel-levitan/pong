@@ -1,0 +1,269 @@
+#include <stdio.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include "./constants.h"
+
+int game_is_running = FALSE;
+int rounds = 0;
+SDL_Window* window = NULL;
+SDL_Renderer* renderer = NULL;
+
+TTF_Font* font = NULL;
+SDL_Surface* surfaceMessage = NULL;
+SDL_Texture* Message = NULL;
+
+/* timestamp do último frame chamado, contados a partir do início de SDL. */
+int last_frame_time = 0;
+
+int updated_direction = NONE;
+int ball_direction = LEFT;
+
+// Struct ball e variável ball
+struct ball {
+	float x;
+	float y;
+	float width;
+	float height;
+} ball;
+
+struct pad {
+	float x;
+	float y;
+	float width;
+	float height;
+} pad1, pad2;
+
+int initialize_window(void) {
+	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+		fprintf(stderr, "Error initializing SDL.\n");
+		return FALSE;
+	}
+
+	/* Window */
+	/* Params: title, x, y, width, height */
+	window = SDL_CreateWindow(
+		NULL, 
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		WINDOW_WIDTH,
+		WINDOW_HEIGHT,
+		SDL_WINDOW_BORDERLESS
+	);
+
+	if (!window) {
+		fprintf(stderr, "Error creating SDL Window.\n");
+		return FALSE;
+	}
+
+	/* Renderer */
+	/* Params: Window attached, display number(-1 busca o default), flags */
+	renderer = SDL_CreateRenderer(window, -1, 0);
+
+	if (!renderer) {
+		fprintf(stderr, "Error creating SDL Renderer.\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+void reinitialize_game() {
+	printf("Round: %d\n", rounds);
+	SDL_Delay(1000);
+
+	updated_direction = NONE;
+	pad1.x = 20;
+	pad1.y = 20;
+
+	ball.x = WINDOW_WIDTH / 2 - ball.width/2;
+	ball.y = WINDOW_HEIGHT / 2 - ball.height/2;
+	ball_direction = LEFT;
+
+	rounds += 1;
+}
+
+void process_input() {
+	SDL_Event event;
+	SDL_PollEvent(&event);
+
+	switch(event.type) {
+	case SDL_QUIT: 
+		game_is_running = FALSE;
+		break;
+	case SDL_KEYDOWN:
+
+		// if (event.key.keysym.sym == SDLK_ESCAPE)
+			// game_is_running = FALSE;
+		switch(event.key.keysym.sym) {
+		case SDLK_ESCAPE:
+			game_is_running = FALSE;
+			break;
+		case SDLK_UP:
+			updated_direction = UP;
+			break;
+		case SDLK_DOWN:
+			updated_direction = DOWN;
+			break;
+		}
+
+		break;
+	}
+}
+
+int check_collision_left() {
+	if (ball.x < pad1.x && ball.y > pad1.y && ball.y < pad1.y + pad1.height)
+		return TRUE;
+	return FALSE;
+}
+
+int check_collision_right() {
+	if (ball.x + ball.width > WINDOW_WIDTH / 2 )
+		return TRUE;
+	return FALSE;
+}
+
+int check_goal_left() {
+	if (ball.x < pad1.x - pad1.width)
+		return TRUE;
+	return FALSE;
+}
+
+void setup() {
+	// SDL_Rect Message_rect; //create a rect
+	// Message_rect.x = 0;  //controls the rect's x coordinate 
+	// Message_rect.y = 0; // controls the rect's y coordinte
+	// Message_rect.w = 100; // controls the width of the rect
+	// Message_rect.h = 100; // controls the height of the rect
+
+	ball.width = 15;
+	ball.height = 15;
+	ball.x = WINDOW_WIDTH / 2 - ball.width/2;
+	ball.y = WINDOW_HEIGHT / 2 - ball.height/2;
+	
+	pad1.x = 20;
+	pad1.y = 20;
+	pad1.width = 10;
+	pad1.height = 80;
+
+	pad2.width = 10;
+	pad2.height = 80;
+	pad2.x = WINDOW_WIDTH / 2 - pad2.width/2;
+	pad2.y = WINDOW_HEIGHT / 2 - pad2.height/2;
+}
+
+void update() {
+	/* Criando o fator delta time. Estamos dividindo por 1000.0 milisegundos */
+	float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
+	/*  O uso de delta_time agora nos mostra a quantidade de tempo passado
+		desde o último frame.
+		Agora pensamos em pixels por segundo.
+	*/
+
+	last_frame_time = SDL_GetTicks();
+
+	/* Isso aqui tem de ser uma função para controlar o pad */
+	/* E agora modificamos a posição da bola em (20) pixels por segundo */
+	switch (updated_direction) {
+	case UP:
+		if (pad1.y - 200 * delta_time >= 0)
+			pad1.y -= 200 * delta_time;
+		break;
+	case DOWN:
+		if (pad1.y + pad1.height + 200 * delta_time < WINDOW_HEIGHT)
+			pad1.y += 200 * delta_time;
+		break;
+	case NONE:
+		break;
+	}
+
+	/* Isso aqui tem de ser uma função para atualizar a posição da bola */
+	/* Conferir colisão */
+	if (ball_direction == LEFT) {
+		if (check_collision_left()) 
+			ball_direction = RIGHT;	
+		 else if (check_goal_left()) {
+			printf("Gol!\n");
+			ball_direction = NONE;
+		} else 			
+			ball.x -= SPEED_FACTOR * delta_time;					
+
+	} else if (ball_direction == RIGHT) {
+		if (check_collision_right()) {
+			ball_direction = LEFT;
+		} else
+			ball.x += SPEED_FACTOR * delta_time;
+				
+	} else {
+		// Check number of rounds
+		if (rounds > 1)
+			game_is_running = FALSE;
+		else
+			reinitialize_game();
+
+	}
+}
+
+void render() {
+	/* Background */
+	/* Setting color */
+	/* Params: render, blue, green, red, transparency */
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderClear(renderer);
+
+	/* Draw */
+	
+	// Ball
+	SDL_Rect ball_rect = {
+		(int)ball.x,
+		(int)ball.y,
+		(int)ball.width,
+		(int)ball.height,
+	};
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderFillRect(renderer, &ball_rect);
+
+
+	SDL_Rect pad1_rect = {
+		(int)pad1.x,
+		(int)pad1.y,
+		(int)pad1.width,
+		(int)pad1.height,
+	};
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderFillRect(renderer, &pad1_rect);
+
+	SDL_Rect pad2_rect = {
+		(int)pad2.x,
+		(int)pad2.y,
+		(int)pad2.width,
+		(int)pad2.height,
+	};
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderFillRect(renderer, &pad2_rect);
+
+	SDL_RenderPresent(renderer);
+}
+
+void destroy_window() {
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+}
+
+int main() {
+	game_is_running = initialize_window();
+
+	setup();
+
+	while (game_is_running) {
+		process_input();
+		update();
+		render();
+	}
+
+	destroy_window();
+
+	return 0;
+}
+
+

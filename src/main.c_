@@ -1,0 +1,236 @@
+#include <stdio.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include "./constants.h"
+
+int game_is_running = FALSE;
+SDL_Window* window = NULL;
+SDL_Renderer* renderer = NULL;
+
+TTF_Font* font = NULL;
+SDL_Surface* surfaceMessage = NULL;
+SDL_Texture* Message = NULL;
+
+/* timestamp do último frame chamado, contados a partir do início de SDL. */
+int last_frame_time = 0;
+
+int updated_direction = NONE;
+
+// Struct ball e variável ball
+struct ball {
+	float x;
+	float y;
+	float width;
+	float height;
+} ball;
+
+struct pad {
+	float x;
+	float y;
+	float width;
+	float height;
+} pad1;
+
+int initialize_window(void) {
+	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+		fprintf(stderr, "Error initializing SDL.\n");
+		return FALSE;
+	}
+
+	/* Window */
+	/* Params: title, x, y, width, height */
+	window = SDL_CreateWindow(
+		NULL, 
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		WINDOW_WIDTH,
+		WINDOW_HEIGHT,
+		SDL_WINDOW_BORDERLESS
+	);
+
+	if (!window) {
+		fprintf(stderr, "Error creating SDL Window.\n");
+		return FALSE;
+	}
+
+	/* Renderer */
+	/* Params: Window attached, display number(-1 busca o default), flags */
+	renderer = SDL_CreateRenderer(window, -1, 0);
+
+	if (!renderer) {
+		fprintf(stderr, "Error creating SDL Renderer.\n");
+		return FALSE;
+	}
+
+	/* TTF */
+	if (TTF_Init() != 0) {
+	    fprintf(stderr, "Error initializing TTF.\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+void process_input() {
+	SDL_Event event;
+	SDL_PollEvent(&event);
+
+	switch(event.type) {
+	case SDL_QUIT: 
+		game_is_running = FALSE;
+		break;
+	case SDL_KEYDOWN:
+
+		// if (event.key.keysym.sym == SDLK_ESCAPE)
+			// game_is_running = FALSE;
+		switch(event.key.keysym.sym) {
+		case SDLK_ESCAPE:
+			game_is_running = FALSE;
+			break;
+		case SDLK_UP:
+			updated_direction = UP;
+			break;
+		case SDLK_DOWN:
+			updated_direction = DOWN;
+			break;
+		}
+
+		break;
+	}
+}
+
+void setup() {
+	SDL_Rect Message_rect; //create a rect
+	Message_rect.x = 0;  //controls the rect's x coordinate 
+	Message_rect.y = 0; // controls the rect's y coordinte
+	Message_rect.w = 100; // controls the width of the rect
+	Message_rect.h = 100; // controls the height of the rect
+
+	ball.width = 15;
+	ball.height = 15;
+	ball.x = WINDOW_WIDTH / 2 - ball.width/2;
+	ball.y = WINDOW_HEIGHT / 2 - ball.height/2;
+	
+	pad1.x = 20;
+	pad1.y = 20;
+	pad1.width = 10;
+	pad1.height = 80;
+
+	font = TTF_OpenFont("assets/Arial-Unicode.ttf", 24);	
+}
+
+void update() {
+	/* Criando o fator delta time. Estamos dividindo por 1000.0 milisegundos */
+	float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
+	/*  O uso de delta_time agora nos mostra a quantidade de tempo passado
+		desde o último frame.
+		Agora pensamos em pixels por segundo.
+	*/
+
+	last_frame_time = SDL_GetTicks();
+
+	/* Isso aqui tem de ser uma função para controlar o pad */
+	/* E agora modificamos a posição da bola em (20) pixels por segundo */
+	switch (updated_direction) {
+	case UP:
+		if (pad1.y - 200 * delta_time >= 0)
+			pad1.y -= 200 * delta_time;
+		break;
+	case DOWN:
+		if (pad1.y + pad1.height + 200 * delta_time < WINDOW_HEIGHT)
+			pad1.y += 200 * delta_time;
+		break;
+	case NONE:
+		break;
+	}
+
+	/* Isso aqui tem de ser uma função para atualizar a posição da bola */
+	/* Conferir colisão */
+	if (ball.x == pad1.x) {
+
+		ball.x += 150 * delta_time;	
+	} else 
+		ball.x -= 150 * delta_time;
+	
+	// ball.y -= 50 * delta_time;
+}
+
+void render() {
+	/* Background */
+	/* Setting color */
+	/* Params: render, blue, green, red, transparency */
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderClear(renderer);
+
+	/* Draw */
+
+	/* Text */
+	SDL_Color color = {255, 255, 255, 255};
+
+	char text[1000];
+
+	sprintf(text, "x_ball: %d x_pad: %d", 1, 2);
+	surfaceMessage = TTF_RenderText_Solid(font, text, color); 
+
+    Message = SDL_CreateTextureFromSurface(renderer, surfaceMessage);
+	SDL_Rect Message_rect; 
+	Message_rect.x = 10;  
+	Message_rect.y = 20; 
+	Message_rect.w = 100; 
+	Message_rect.h = 20; 
+
+	SDL_RenderCopy(renderer, Message, NULL, &Message_rect);
+	
+
+	// Ball
+	// SDL_Rect ball_rect = {
+	// 	(int)ball.x,
+	// 	(int)ball.y,
+	// 	(int)ball.width,
+	// 	(int)ball.height,
+	// };
+	// SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	// SDL_RenderFillRect(renderer, &ball_rect);
+
+
+	// SDL_Rect pad1_rect = {
+	// 	(int)pad1.x,
+	// 	(int)pad1.y,
+	// 	(int)pad1.width,
+	// 	(int)pad1.height,
+	// };
+	// SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	// SDL_RenderFillRect(renderer, &pad1_rect);
+
+	SDL_RenderPresent(renderer);
+}
+
+void destroy_window() {
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+
+	SDL_FreeSurface(surfaceMessage);
+	SDL_DestroyTexture(Message);
+	TTF_CloseFont(font);
+
+    TTF_Quit();
+	SDL_Quit();
+}
+
+int main() {
+	game_is_running = initialize_window();
+
+	setup();
+
+	while (game_is_running) {
+		process_input();
+		update();
+		render();
+	}
+
+	destroy_window();
+
+	return 0;
+}
+
+
